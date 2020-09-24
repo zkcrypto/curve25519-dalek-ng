@@ -183,6 +183,7 @@ type UnpackedScalar = backend::serial::u32::scalar::Scalar29;
 /// The `Scalar` struct holds an integer \\(s < 2\^{255} \\) which
 /// represents an element of \\(\mathbb Z / \ell\\).
 #[derive(Copy, Clone, Hash)]
+#[cfg_attr(feature = "borsh", derive(BorshSerialize, BorshDeserialize))]
 pub struct Scalar {
     /// `bytes` is a little-endian byte encoding of an integer representing a scalar modulo the
     /// group order.
@@ -1663,6 +1664,24 @@ mod test {
         assert_eq!(
             X,
             bincode::deserialize(X.as_bytes()).unwrap(),
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "borsh")]
+    fn borsh_scalar_roundtrip() {
+        use borsh::{BorshSerialize, BorshDeserialize};
+        let encoded = X.try_to_vec().unwrap();
+        let parsed = Scalar::try_from_slice(&encoded).unwrap();
+        assert_eq!(parsed, X);
+
+        // Check that the encoding is 32 bytes exactly
+        assert_eq!(encoded.len(), 32);
+
+        // Check that the encoding itself matches the usual one
+        assert_eq!(
+            X,
+            Scalar::try_from_slice(X.as_bytes()).unwrap(),
         );
     }
 

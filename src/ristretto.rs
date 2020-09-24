@@ -209,6 +209,7 @@ use backend::vector::scalar_mul;
 /// The Ristretto encoding is canonical, so two points are equal if and
 /// only if their encodings are equal.
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "borsh", derive(BorshSerialize, BorshDeserialize))]
 pub struct CompressedRistretto(pub [u8; 32]);
 
 impl ConstantTimeEq for CompressedRistretto {
@@ -435,6 +436,7 @@ impl<'de> Deserialize<'de> for CompressedRistretto {
 /// `EdwardsPoint`s.
 ///
 #[derive(Copy, Clone)]
+#[cfg_attr(feature = "borsh", derive(BorshSerialize, BorshDeserialize))]
 pub struct RistrettoPoint(pub(crate) EdwardsPoint);
 
 impl RistrettoPoint {
@@ -1114,6 +1116,25 @@ mod test {
         let raw_bytes = constants::RISTRETTO_BASEPOINT_COMPRESSED.as_bytes();
         let bp: RistrettoPoint = bincode::deserialize(raw_bytes).unwrap();
         assert_eq!(bp, constants::RISTRETTO_BASEPOINT_POINT);
+    }
+
+    #[test]
+    #[cfg(feature = "borsh")]
+    fn borsh_basepoint_roundtrip() {
+        use borsh::{BorshSerialize, BorshDeserialize};
+
+        let enc_compressed = constants::RISTRETTO_BASEPOINT_COMPRESSED.try_to_vec().unwrap();
+        assert_eq!(enc_compressed.len(), 32);
+        let dec_compressed = CompressedRistretto::try_from_slice(&enc_compressed).unwrap();
+        assert_eq!(dec_compressed, constants::RISTRETTO_BASEPOINT_COMPRESSED);
+
+        // Unlike the serde instances, the borsh instances do not automatically
+        // compress and decompress points. This gives the user the option to
+        // trade memory for CPU cycles.
+        let encoded = constants::RISTRETTO_BASEPOINT_POINT.try_to_vec().unwrap();
+        assert_eq!(encoded.len(), 160);
+        let dec_uncompressed = RistrettoPoint::try_from_slice(&encoded).unwrap();
+        assert_eq!(dec_uncompressed, constants::RISTRETTO_BASEPOINT_POINT);
     }
 
     #[test]

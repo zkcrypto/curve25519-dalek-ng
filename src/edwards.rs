@@ -308,6 +308,7 @@ impl<'de> Deserialize<'de> for CompressedEdwardsY {
 
 /// An `EdwardsPoint` represents a point on the Edwards form of Curve25519.
 #[derive(Copy, Clone)]
+#[cfg_attr(feature = "borsh", derive(BorshSerialize, BorshDeserialize))]
 #[allow(missing_docs)]
 pub struct EdwardsPoint {
     pub(crate) X: FieldElement,

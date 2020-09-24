@@ -52,6 +52,9 @@ extern crate subtle;
 extern crate bincode;
 #[cfg(feature = "serde")]
 extern crate serde;
+#[cfg(feature = "borsh")]
+#[macro_use]
+extern crate borsh;
 
 // Internal macros. Must come first!
 #[macro_use]
