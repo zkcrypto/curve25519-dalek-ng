@@ -421,6 +421,34 @@ impl<'de> Deserialize<'de> for CompressedRistretto {
 }
 
 // ------------------------------------------------------------------------
+// Borsh support
+// ------------------------------------------------------------------------
+// Serializes to and from `RistrettoPoint` directly, doing compression
+// and decompression internally.  This means that users can create
+// structs containing `RistrettoPoint`s and use Borsh's derived
+// serializers to serialize those structures.
+
+#[cfg(feature = "borsh")]
+use borsh::{BorshSerialize, BorshDeserialize};
+#[cfg(feature = "borsh")]
+use std::io::{Error, ErrorKind, Write};
+
+#[cfg(feature = "borsh")]
+impl BorshSerialize for RistrettoPoint {
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
+        BorshSerialize::serialize(&self.compress(), writer)
+    }
+}
+
+#[cfg(feature = "borsh")]
+impl BorshDeserialize for RistrettoPoint {
+    fn deserialize(buf: &mut &[u8]) -> Result<Self, Error> {
+        let compressed: CompressedRistretto = BorshDeserialize::deserialize(buf)?;
+        compressed.decompress().ok_or(Error::new(ErrorKind::InvalidInput, "decompression failed"))
+    }
+}
+
+// ------------------------------------------------------------------------
 // Internal point representations
 // ------------------------------------------------------------------------
 
@@ -436,7 +464,6 @@ impl<'de> Deserialize<'de> for CompressedRistretto {
 /// `EdwardsPoint`s.
 ///
 #[derive(Copy, Clone)]
-#[cfg_attr(feature = "borsh", derive(BorshSerialize, BorshDeserialize))]
 pub struct RistrettoPoint(pub(crate) EdwardsPoint);
 
 impl RistrettoPoint {
@@ -1123,18 +1150,23 @@ mod test {
     fn borsh_basepoint_roundtrip() {
         use borsh::{BorshSerialize, BorshDeserialize};
 
+        let encoded = constants::RISTRETTO_BASEPOINT_POINT.try_to_vec().unwrap();
         let enc_compressed = constants::RISTRETTO_BASEPOINT_COMPRESSED.try_to_vec().unwrap();
-        assert_eq!(enc_compressed.len(), 32);
+        assert_eq!(encoded, enc_compressed);
+
+        // Check that the encoding is 32 bytes exactly
+        assert_eq!(encoded.len(), 32);
+
+        let dec_uncompressed = RistrettoPoint::try_from_slice(&encoded).unwrap();
         let dec_compressed = CompressedRistretto::try_from_slice(&enc_compressed).unwrap();
+
+        assert_eq!(dec_uncompressed, constants::RISTRETTO_BASEPOINT_POINT);
         assert_eq!(dec_compressed, constants::RISTRETTO_BASEPOINT_COMPRESSED);
 
-        // Unlike the serde instances, the borsh instances do not automatically
-        // compress and decompress points. This gives the user the option to
-        // trade memory for CPU cycles.
-        let encoded = constants::RISTRETTO_BASEPOINT_POINT.try_to_vec().unwrap();
-        assert_eq!(encoded.len(), 160);
-        let dec_uncompressed = RistrettoPoint::try_from_slice(&encoded).unwrap();
-        assert_eq!(dec_uncompressed, constants::RISTRETTO_BASEPOINT_POINT);
+        // Check that the encoding itself matches the usual one
+        let raw_bytes = constants::RISTRETTO_BASEPOINT_COMPRESSED.as_bytes();
+        let bp = RistrettoPoint::try_from_slice(raw_bytes).unwrap();
+        assert_eq!(bp, constants::RISTRETTO_BASEPOINT_POINT);
     }
 
     #[test]
